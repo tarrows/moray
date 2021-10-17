@@ -1,16 +1,19 @@
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
+use web_sys::WebGl2RenderingContext;
 
 #[wasm_bindgen]
-pub fn greet() -> String {
-  "Hello, {{project-name}}!".to_string()
-}
+pub fn start() -> Result<(), JsValue> {
+  let document = web_sys::window().unwrap().document().unwrap();
+  let canvas = document.get_element_by_id("canvas").unwrap();
+  let canvas: web_sys::HtmlCanvasElement = canvas.dyn_into::<web_sys::HtmlCanvasElement>()?;
+  let context = canvas
+    .get_context("webgl2")?
+    .unwrap()
+    .dyn_into::<WebGl2RenderingContext>()?;
 
-#[cfg(test)]
-mod tests {
-  use super::*;
+  context.clear_color(0.0, 0.0, 0.0, 1.0);
+  context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
-  #[test]
-  fn it_works() {
-    assert_eq!(greet(), "Hello, {{project-name}}!".to_string())
-  }
+  Ok(())
 }
