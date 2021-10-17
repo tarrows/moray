@@ -12,7 +12,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "rust-wasm-fem": "file:../pkg"
+    "moray": "file:../pkg"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^9.0.1",

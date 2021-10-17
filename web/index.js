@@ -1,3 +1,3 @@
-import * as wasm from "rust-wasm-fem";
+import * as wasm from "moray";
 
-wasm.start();
+wasm.greet();
