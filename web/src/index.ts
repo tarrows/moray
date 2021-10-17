@@ -1,1 +1,3 @@
-console.log("it works!");
+import("../../pkg").then(mod => {
+  console.log(mod.greet())
+});
