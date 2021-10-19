@@ -63,16 +63,16 @@ pub fn start() -> Result<(), JsValue> {
   context.enable_vertex_attrib_array(vertex_position);
   context.bind_vertex_array(Some(&vao));
 
-  draw(
-    &context,
-    &program,
-    canvas.width,
-    canvas.height,
+  let info = ShaderInfo {
+    program: &program,
+    canvas_height: canvas.height,
+    canvas_width: canvas.width,
     vertex_position,
-    &projection_matrix,
-    &model_view_matrix,
-    &buffers,
-  );
+    program_projection_matrix: &projection_matrix,
+    program_model_view_matrix: &model_view_matrix,
+  };
+
+  draw(&context, &info, &buffers);
 
   Ok(())
 }
@@ -99,16 +99,16 @@ fn init_buffers(context: &WebGl2RenderingContext) -> WebGlBuffer {
   position_buffer
 }
 
-fn draw(
-  context: &WebGl2RenderingContext,
-  shader_program: &WebGlProgram,
+struct ShaderInfo<'a> {
+  program: &'a WebGlProgram,
   canvas_width: f32,
   canvas_height: f32,
   vertex_position: u32,
-  program_projection_matrix: &WebGlUniformLocation,
-  program_model_view_matrix: &WebGlUniformLocation,
-  position_buffer: &WebGlBuffer,
-) {
+  program_projection_matrix: &'a WebGlUniformLocation,
+  program_model_view_matrix: &'a WebGlUniformLocation,
+}
+
+fn draw(context: &WebGl2RenderingContext, info: &ShaderInfo, position_buffer: &WebGlBuffer) {
   context.clear_color(0.0, 0.0, 0.0, 1.0);
   context.clear_depth(1.0);
   context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
@@ -119,7 +119,7 @@ fn draw(
     .clear(WebGl2RenderingContext::COLOR_BUFFER_BIT | WebGl2RenderingContext::DEPTH_BUFFER_BIT);
 
   let field_of_view = 45.0 * std::f32::consts::PI / 180.0;
-  let aspect = canvas_width / canvas_height;
+  let aspect = info.canvas_width / info.canvas_height;
   let z_near = 0.1;
   let z_far = 100.0;
 
@@ -138,7 +138,7 @@ fn draw(
 
     context.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&position_buffer));
     context.vertex_attrib_pointer_with_i32(
-      vertex_position,
+      info.vertex_position,
       num_components,
       data_type,
       normalize,
@@ -146,19 +146,19 @@ fn draw(
       offset,
     );
 
-    context.enable_vertex_attrib_array(vertex_position);
+    context.enable_vertex_attrib_array(info.vertex_position);
   }
 
-  context.use_program(Some(&shader_program));
+  context.use_program(Some(info.program));
 
   context.uniform_matrix4fv_with_f32_array(
-    Some(program_projection_matrix),
+    Some(info.program_projection_matrix),
     false,
     &vec_projection_matrix,
   );
 
   context.uniform_matrix4fv_with_f32_array(
-    Some(program_model_view_matrix),
+    Some(info.program_model_view_matrix),
     false,
     &vec_model_view_matrix,
   );
