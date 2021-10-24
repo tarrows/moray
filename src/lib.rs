@@ -8,18 +8,24 @@ use webgl::{compile_shader, get_context_by_id, link_shader_program};
 
 static VERTEX_SHADER: &'static str = r#"
   attribute vec4 aVertexPosition;
+  attribute vec4 aVertexColor;
 
   uniform mat4 uModelViewMatrix;
   uniform mat4 uProjectionMatrix;
 
+  varying lowp vec4 vColor;
+
   void main() {
     gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+    vColor = aVertexColor;
   }
 "#;
 
 static FRAGMENT_SHADER: &'static str = r#"
+  varying lowp vec4 vColor;
+
   void main() {
-    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    gl_FragColor = vColor;
   }
 "#;
 
@@ -53,11 +59,15 @@ pub fn start() -> Result<(), JsValue> {
     .get_uniform_location(&program, "uProjectionMatrix")
     .unwrap();
 
+  let vertex_color = context.get_attrib_location(&program, "aVertexColor") as u32;
+  context.enable_vertex_attrib_array(vertex_color);
+
   let buffers = init_buffers(&context);
 
   let vao = context
     .create_vertex_array()
     .ok_or("Could not create vertex array object")?;
+
   context.bind_vertex_array(Some(&vao));
   context.vertex_attrib_pointer_with_i32(0, 3, WebGl2RenderingContext::FLOAT, false, 0, 0);
   context.enable_vertex_attrib_array(vertex_position);
@@ -68,6 +78,7 @@ pub fn start() -> Result<(), JsValue> {
     canvas_height: canvas.height,
     canvas_width: canvas.width,
     vertex_position,
+    vertex_color,
     program_projection_matrix: &projection_matrix,
     program_model_view_matrix: &model_view_matrix,
   };
@@ -77,7 +88,7 @@ pub fn start() -> Result<(), JsValue> {
   Ok(())
 }
 
-fn init_buffers(context: &WebGl2RenderingContext) -> WebGlBuffer {
+fn init_buffers(context: &WebGl2RenderingContext) -> (WebGlBuffer, WebGlBuffer) {
   let positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0];
 
   let position_buffer = context
@@ -96,7 +107,28 @@ fn init_buffers(context: &WebGl2RenderingContext) -> WebGlBuffer {
     );
   }
 
-  position_buffer
+  let colors = [
+    1.0, 1.0, 1.0, 1.0, // White
+    1.0, 0.0, 0.0, 1.0, // Red
+    0.0, 1.0, 0.0, 1.0, // Green
+    0.0, 0.0, 1.0, 1.0, // Blue
+  ];
+  let color_buffer = context
+    .create_buffer()
+    .ok_or("Failed to create buffer")
+    .unwrap();
+  context.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&color_buffer));
+  unsafe {
+    let colors_array_buffer_view = js_sys::Float32Array::view(&colors);
+
+    context.buffer_data_with_array_buffer_view(
+      WebGl2RenderingContext::ARRAY_BUFFER,
+      &colors_array_buffer_view,
+      WebGl2RenderingContext::STATIC_DRAW,
+    );
+  }
+
+  (position_buffer, color_buffer)
 }
 
 struct ShaderInfo<'a> {
@@ -104,11 +136,16 @@ struct ShaderInfo<'a> {
   canvas_width: f32,
   canvas_height: f32,
   vertex_position: u32,
+  vertex_color: u32,
   program_projection_matrix: &'a WebGlUniformLocation,
   program_model_view_matrix: &'a WebGlUniformLocation,
 }
 
-fn draw(context: &WebGl2RenderingContext, info: &ShaderInfo, position_buffer: &WebGlBuffer) {
+fn draw(
+  context: &WebGl2RenderingContext,
+  info: &ShaderInfo,
+  (position_buffer, color_buffer): &(WebGlBuffer, WebGlBuffer),
+) {
   context.clear_color(0.0, 0.0, 0.0, 1.0);
   context.clear_depth(1.0);
   context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
@@ -147,6 +184,24 @@ fn draw(context: &WebGl2RenderingContext, info: &ShaderInfo, position_buffer: &W
     );
 
     context.enable_vertex_attrib_array(info.vertex_position);
+  }
+
+  {
+    let num_components = 4;
+    let data_type: u32 = WebGl2RenderingContext::FLOAT;
+    let normalize = false;
+    let stride = 0;
+    let offset = 0;
+    context.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&color_buffer));
+    context.vertex_attrib_pointer_with_i32(
+      info.vertex_color,
+      num_components,
+      data_type,
+      normalize,
+      stride,
+      offset,
+    );
+    context.enable_vertex_attrib_array(info.vertex_color);
   }
 
   context.use_program(Some(info.program));
